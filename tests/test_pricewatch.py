@@ -73,3 +73,12 @@ def test_extract_title():
     html = """<meta property="og:title" content="OG naam"><script type="application/ld+json">{"@type":"Product","name":"Sony WH-1000XM5"}</script>"""
     assert extract_title(html) == "Sony WH-1000XM5"
     assert extract_title('<title> Pagina </title>') == "Pagina"
+
+
+def test_personal_recipient(monkeypatch):
+    from pricewatch import notify
+    monkeypatch.setenv("MAIL_TO", "algemeen@x.nl")
+    monkeypatch.setenv("SECRETS_JSON", '{"MAIL_TO_SANNE": "sanne@x.nl"}')
+    assert notify.recipient("sanne") == "sanne@x.nl"
+    assert notify.recipient("dennis") == "algemeen@x.nl"
+    assert notify.recipient(None) == "algemeen@x.nl"
