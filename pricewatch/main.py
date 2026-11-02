@@ -38,7 +38,12 @@ def load_config() -> tuple[dict, list[dict]]:
         cfg = {**defaults, **{k: v for k, v in p.items() if v not in (None, "")}}
         cfg.setdefault("id", p["url"])
         products.append(cfg)
-    return data.get("settings") or {}, products
+    settings = data.get("settings") or {}
+    users = settings.get("users") or []
+    first = users[0]["id"] if users else None
+    for cfg in products:                      # producten van vóór de profielen horen bij de eerste persoon
+        cfg["owner"] = cfg.get("owner") or first
+    return settings, products
 
 
 def load_history() -> dict:
@@ -75,7 +80,7 @@ def check_product(cfg: dict, entry: dict, now, dry_run: bool, dashboard_url: str
         entry["last_error"] = f"{type(exc).__name__}: {exc}"[:300]
         print(f"- {entry['name']}: FOUT ({entry['failures']}x): {entry['last_error']}")
         if entry["failures"] == ERROR_ALERT_AFTER and not dry_run:
-            notify.error_alert({**cfg, "name": entry["name"]}, entry["last_error"], entry["failures"])
+            notify.error_alert({**cfg, "name": entry["name"]}, entry["last_error"], entry["failures"], cfg.get("owner"))
         return
 
     if title:
@@ -95,7 +100,7 @@ def check_product(cfg: dict, entry: dict, now, dry_run: bool, dashboard_url: str
         if not state.get("active") or new_low:
             print(f"  ALARM: {'; '.join(a.reasons)}")
             if not dry_run:
-                notify.price_alert(cfg, a, dashboard_url)
+                notify.price_alert(cfg, a, dashboard_url, cfg.get("owner"))
             state.update(active=True, price=price, at=now.isoformat())
         else:
             print("  alarm al eerder verstuurd voor deze prijs")
@@ -116,6 +121,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--test-mail", action="store_true")
+    ap.add_argument("--user", help="profiel-id voor --test-mail")
     args = ap.parse_args(argv)
 
     settings, products = load_config()
@@ -127,7 +133,9 @@ def main(argv: list[str] | None = None) -> int:
             "Het werkt! Je ontvangt hier een melding zodra een product echt in prijs daalt.",
             "<p style='font-family:Segoe UI,Arial,sans-serif'>Het werkt! Je ontvangt hier een melding "
             "zodra een product echt in prijs daalt.</p>",
+            notify.recipient(args.user),
         )
+        notify.send_push("Price Watch: testmelding", "Het werkt!", None, args.user)
         return 0 if ok else 1
 
     db = load_history()

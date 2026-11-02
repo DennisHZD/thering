@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import json
 import os
 import smtplib
 import ssl
@@ -15,9 +16,29 @@ def _env(name: str, default: str | None = None) -> str | None:
     return val.strip() if isinstance(val, str) and val.strip() else default
 
 
-def send_email(subject: str, text: str, html_body: str) -> bool:
+def _secrets() -> dict:
+    try:
+        return json.loads(os.environ.get("SECRETS_JSON") or "{}")
+    except json.JSONDecodeError:
+        return {}
+
+
+def _personal(base: str, user: str | None) -> str | None:
+    """Persoonlijke instelling (bijv. MAIL_TO_DENNIS), anders de algemene (MAIL_TO)."""
+    if user:
+        val = _secrets().get(f"{base}_{user.upper()}") or os.environ.get(f"{base}_{user.upper()}")
+        if val and val.strip():
+            return val.strip()
+    return _env(base)
+
+
+def recipient(user: str | None) -> str | None:
+    return _personal("MAIL_TO", user)
+
+
+def send_email(subject: str, text: str, html_body: str, to: str | None = None) -> bool:
     host = _env("SMTP_HOST")
-    to = _env("MAIL_TO")
+    to = to or _env("MAIL_TO")
     if not host or not to:
         print("  [mail] SMTP_HOST of MAIL_TO niet ingesteld, mail overgeslagen")
         return False
@@ -49,8 +70,8 @@ def send_email(subject: str, text: str, html_body: str) -> bool:
     return True
 
 
-def send_push(title: str, message: str, url: str | None = None) -> None:
-    topic = _env("NTFY_TOPIC")
+def send_push(title: str, message: str, url: str | None = None, user: str | None = None) -> None:
+    topic = _personal("NTFY_TOPIC", user)
     if not topic:
         return
     headers = {"Title": title.encode("utf-8"), "Priority": "high", "Tags": "moneybag"}
@@ -67,7 +88,7 @@ def _eur(v) -> str:
     return "–" if v is None else f"€ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def price_alert(product: dict, a, dashboard_url: str | None) -> None:
+def price_alert(product: dict, a, dashboard_url: str | None, user: str | None = None) -> None:
     name = product["name"]
     url = product["url"]
     subject = f"Prijsalarm: {name} nu {_eur(a.price)} ({a.real_discount_pct:.0f}% onder mediaan)"
@@ -103,11 +124,11 @@ def price_alert(product: dict, a, dashboard_url: str | None) -> None:
 <p><a href="{html.escape(url)}" style="display:inline-block;background:#c6613f;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Naar de winkel</a></p>
 {dash}
 </div>"""
-    send_email(subject, text, body)
-    send_push(subject, "; ".join(a.reasons), url)
+    send_email(subject, text, body, recipient(user))
+    send_push(subject, "; ".join(a.reasons), url, user)
 
 
-def error_alert(product: dict, error: str, failures: int) -> None:
+def error_alert(product: dict, error: str, failures: int, user: str | None = None) -> None:
     subject = f"Price watch: {product['name']} kan niet meer gelezen worden"
     text = (
         f"{product['name']}\n{product['url']}\n\n"
@@ -115,4 +136,4 @@ def error_alert(product: dict, error: str, failures: int) -> None:
         f"Laatste fout: {error}\n\n"
         "Mogelijke oplossingen: voeg een 'selector' toe, zet 'render: true', of controleer de URL."
     )
-    send_email(subject, text, "<pre style='font-family:inherit'>" + html.escape(text) + "</pre>")
+    send_email(subject, text, "<pre style='font-family:inherit'>" + html.escape(text) + "</pre>", recipient(user))
