@@ -18,6 +18,10 @@ on:
         description: "Alleen een testmail sturen"
         type: boolean
         default: false
+      user:
+        description: "Profiel voor de testmail"
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -58,11 +62,14 @@ jobs:
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          # persoonlijke instellingen per profiel (MAIL_TO_<PROFIEL>, NTFY_TOPIC_<PROFIEL>)
+          SECRETS_JSON: ${{ toJSON(secrets) }}
+          TEST_USER: ${{ inputs.user }}
           ONLY: ${{ inputs.only }}
           FORCE: ${{ inputs.force }}
           TEST_MAIL: ${{ inputs.test_mail }}
         run: |
-          if [ "$TEST_MAIL" = "true" ]; then python -m pricewatch.main --test-mail
+          if [ "$TEST_MAIL" = "true" ]; then python -m pricewatch.main --test-mail --user "$TEST_USER"
           elif [ -n "$ONLY" ]; then python -m pricewatch.main --only "$ONLY"
           elif [ "$FORCE" = "true" ]; then python -m pricewatch.main --force
           else python -m pricewatch.main; fi
