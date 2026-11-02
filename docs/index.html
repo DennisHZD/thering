@@ -92,7 +92,20 @@
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; vertical-align: -2px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  #login { max-width: 520px; margin: 8vh auto 0; }
+  #login, #pick { max-width: 520px; margin: 8vh auto 0; }
+  .hdr-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .who { display: flex; gap: 8px; align-items: center; padding: 4px 14px 4px 4px; border-radius: 99px; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; color: #fff; display: inline-grid; place-items: center; font-weight: 600; font-size: 13px; flex: none; }
+  .pick-list { display: grid; gap: 8px; }
+  .pick-list button { display: flex; gap: 12px; align-items: center; text-align: left; padding: 12px 14px; font-size: 16px; }
+  .inline-add { display: flex; gap: 8px; }
+  .inline-add input { flex: 1; }
+  .people { list-style: none; padding: 0; margin: 0; }
+  .people li { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+  .people li:first-child { border-top: 0; }
+  .people li .grow { flex: 1; }
+  .badge.owner { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); border: 1px solid var(--line); padding: 1px 8px 1px 2px; }
+  .badge.owner .avatar { width: 18px; height: 18px; font-size: 10px; }
   #login ol { padding-left: 20px; font-size: 14px; }
   #login li { margin-bottom: 6px; }
   code { background: var(--field); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: 13px; }
@@ -137,7 +150,22 @@
         <li>Klik <i>Generate token</i> en plak het hierboven.</li>
       </ol>
       <p class="muted">Het token blijft alleen in deze browser bewaard en geeft uitsluitend toegang tot die ene repository.</p>
+      <p class="muted"><b>Voor je partner:</b> maak op dezelfde manier een tweede token aan (bijv. naam <code>Price Watch – Sanne</code>) en geef dat aan je partner. Zo kun je het later los intrekken.</p>
     </details>
+  </div>
+</section>
+
+<!-- ================= PROFIEL KIEZEN ================= -->
+<section id="pick" hidden>
+  <div class="card stack">
+    <h1><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#d97757"/><path d="M7 11l6 6 4-4 8 7" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg> Wie ben jij?</h1>
+    <p class="muted" style="margin-top:4px">Kies je profiel. Je ziet dan je eigen producten en krijgt alleen meldingen over wat jij volgt. Dit apparaat onthoudt je keuze.</p>
+    <div class="pick-list" id="pick-list"></div>
+    <form id="pick-new" class="inline-add" autocomplete="off">
+      <input id="p-name" type="text" placeholder="Nieuw profiel, bijv. je naam" maxlength="30">
+      <button class="primary" type="submit">Toevoegen</button>
+    </form>
+    <div id="pick-back"><button type="button" id="pick-cancel" class="small">Terug</button></div>
   </div>
 </section>
 
@@ -148,10 +176,13 @@
       <h1><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#d97757"/><path d="M7 11l6 6 4-4 8 7" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg> Price Watch</h1>
       <div class="status" id="status">Laden…</div>
     </div>
-    <nav role="tablist">
-      <button role="tab" data-tab="products" aria-selected="true">Producten</button>
-      <button role="tab" data-tab="settings" aria-selected="false">Instellingen</button>
-    </nav>
+    <div class="hdr-right">
+      <nav role="tablist">
+        <button role="tab" data-tab="products" aria-selected="true">Producten</button>
+        <button role="tab" data-tab="settings" aria-selected="false">Instellingen</button>
+      </nav>
+      <button type="button" class="who" id="who" title="Van profiel wisselen"><span class="avatar" id="who-av"></span><span id="who-name"></span></button>
+    </div>
   </header>
 
   <!-- ---------- PRODUCTEN ---------- -->
@@ -180,7 +211,13 @@
     </form>
 
     <div class="toolbar">
-      <div class="muted" id="count"></div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div class="ranges" id="scope" role="group" aria-label="Welke producten">
+          <button data-scope="mine" aria-pressed="true">Mijn producten</button>
+          <button data-scope="all">Iedereen</button>
+        </div>
+        <span class="muted" id="count"></span>
+      </div>
       <div class="ranges" role="group" aria-label="Periode grafiek">
         <button data-days="7">7 d</button>
         <button data-days="30" aria-pressed="true">30 d</button>
@@ -193,8 +230,25 @@
 
   <!-- ---------- INSTELLINGEN ---------- -->
   <div id="tab-settings" hidden class="stack">
+    <form id="me-form" class="card stack" autocomplete="off">
+      <h2>Mijn meldingen</h2>
+      <p class="muted" style="margin:0">Je krijgt alleen meldingen over producten die jij volgt.</p>
+      <div class="row">
+        <div><label for="s-ME_MAIL">Mijn e-mailadres <span class="set" data-me="MAIL_TO"></span></label>
+          <input id="s-ME_MAIL" type="email" placeholder="jij@voorbeeld.nl"></div>
+        <div><label for="s-ME_NTFY">ntfy.sh-topic <span class="muted">(optioneel, push op telefoon)</span> <span class="set" data-me="NTFY_TOPIC"></span></label>
+          <input id="s-ME_NTFY" type="text" placeholder="bijv. sanne-pw-8f3k2"></div>
+      </div>
+      <p class="muted" style="margin:0">Voor pushmeldingen: installeer de ntfy-app, abonneer op een zelfverzonnen, moeilijk te raden topic en vul dat hier in.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="primary" type="submit">Opslaan</button>
+        <button type="button" id="test-mail">Testmelding sturen</button>
+      </div>
+    </form>
+
     <form id="mail-form" class="card stack" autocomplete="off">
-      <h2>E-mailmeldingen</h2>
+      <h2>Verzendaccount <span class="muted" style="font-family:system-ui,sans-serif;font-size:13px">gedeeld</span></h2>
+      <p class="muted" style="margin:0">Via dit account worden de meldingen voor iedereen verstuurd. Hoeft maar één keer ingesteld te worden.</p>
       <div class="row">
         <div>
           <label for="m-preset">Provider</label>
@@ -205,8 +259,8 @@
             <option value="other">Anders</option>
           </select>
         </div>
-        <div><label for="s-MAIL_TO">Meldingen naar <span class="set" data-for="MAIL_TO"></span></label>
-          <input id="s-MAIL_TO" type="text" placeholder="jij@voorbeeld.nl"></div>
+        <div><label for="s-MAIL_FROM">Afzender <span class="muted">(optioneel)</span> <span class="set" data-for="MAIL_FROM"></span></label>
+          <input id="s-MAIL_FROM" type="text" placeholder="standaard: gebruikersnaam"></div>
       </div>
       <div class="row">
         <div><label for="s-SMTP_HOST">SMTP-server <span class="set" data-for="SMTP_HOST"></span></label>
@@ -221,22 +275,19 @@
           <input id="s-SMTP_PASSWORD" type="password" autocomplete="new-password"></div>
       </div>
       <p class="muted" id="m-hint" style="margin:0"></p>
-      <details>
-        <summary>Afzender en pushmeldingen</summary>
-        <div class="row">
-          <div><label for="s-MAIL_FROM">Afzender <span class="muted">(optioneel)</span> <span class="set" data-for="MAIL_FROM"></span></label>
-            <input id="s-MAIL_FROM" type="text" placeholder="standaard: gebruikersnaam"></div>
-          <div><label for="s-NTFY_TOPIC">ntfy.sh-topic <span class="muted">(push op telefoon)</span> <span class="set" data-for="NTFY_TOPIC"></span></label>
-            <input id="s-NTFY_TOPIC" type="text" placeholder="bijv. dennis-pw-8f3k2"></div>
-        </div>
-        <p class="muted">Installeer de ntfy-app, abonneer op een zelfverzonnen, moeilijk te raden topic en vul dat hier in.</p>
-      </details>
       <p class="muted" style="margin:0">Gegevens worden versleuteld opgeslagen als GitHub-secrets en zijn daarna niet meer uit te lezen. Lege velden blijven ongewijzigd.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="primary" type="submit">Opslaan</button>
-        <button type="button" id="test-mail">Testmail sturen</button>
-      </div>
+      <div><button class="primary" type="submit">Opslaan</button></div>
     </form>
+
+    <div class="card stack">
+      <h2>Personen</h2>
+      <ul class="people" id="people"></ul>
+      <form id="people-new" class="inline-add" autocomplete="off">
+        <input id="pp-name" type="text" placeholder="Naam van nieuw profiel" maxlength="30">
+        <button type="submit">Toevoegen</button>
+      </form>
+      <p class="muted" style="margin:0">Je partner logt in met een eigen token (zie <i>Hoe maak ik een token aan?</i> op het inlogscherm) en kiest daarna zijn of haar profiel. Iedereen die is ingelogd kan via <i>Iedereen</i> ook de producten van de ander zien.</p>
+    </div>
 
     <form id="check-form" class="card stack">
       <h2>Controle</h2>
@@ -300,7 +351,8 @@
 "use strict";
 const API = "https://api.github.com";
 const WORKFLOW = "check-prices.yml";
-const SECRET_NAMES = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "MAIL_TO", "MAIL_FROM", "NTFY_TOPIC"];
+const SECRET_NAMES = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"];   // gedeeld
+const COLORS = ["#d97757", "#6a9bcc", "#5f9e6e", "#a77bc4", "#c99a3c", "#c46a8a"];
 const PRESETS = {
   gmail: { SMTP_HOST: "smtp.gmail.com", SMTP_PORT: "587", hint: 'Gmail vereist 2-stapsverificatie en een <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">app-wachtwoord</a> (16 tekens). Je normale wachtwoord werkt niet.' },
   outlook: { SMTP_HOST: "smtp.office365.com", SMTP_PORT: "587", hint: "Werkt alleen als SMTP-authenticatie voor je account is toegestaan; bij werkaccounts is dat vaak uitgeschakeld. Gmail is meestal de makkelijkste keuze." },
@@ -377,6 +429,88 @@ let CFG = { settings: {}, defaults: {}, products: [] };
 let HIST = { products: {} };
 let RUNS = [];
 let days = 30, charts = [], busy = new Set();
+let ME = null, scope = "mine";
+
+// ---------------------------------------------------------------- profielen
+const users = () => CFG.settings.users || [];
+const userById = id => users().find(u => u.id === id);
+const ownerOf = p => p.owner || users()[0]?.id;
+const meKey = base => `${base}_${ME.toUpperCase()}`;
+function avatar(u) {
+  const i = Math.max(0, users().indexOf(u));
+  return `<span class="avatar" style="background:${COLORS[i % COLORS.length]}">${esc((u?.name || "?").trim()[0]?.toUpperCase() || "?")}</span>`;
+}
+async function addUser(name) {
+  name = name.trim();
+  if (!name) throw new Error("Vul een naam in.");
+  let id;
+  await saveConfig(cfg => {
+    const list = cfg.settings.users ||= [];
+    if (list.some(u => u.name.toLowerCase() === name.toLowerCase())) throw new Error("Dat profiel bestaat al.");
+    const base = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 20) || "persoon";
+    id = base; let n = 2;
+    while (list.some(u => u.id === id)) id = `${base}_${n++}`;
+    if (!list.length) cfg.products.forEach(p => { p.owner ||= id; });   // bestaande producten horen bij het eerste profiel
+    list.push({ id, name });
+  }, `Profiel toegevoegd: ${name}`);
+  return id;
+}
+function setMe(id) {
+  ME = id; store.set("pw_user", id);
+  const u = userById(id);
+  $("#who-av").outerHTML = avatar(u).replace('class="avatar"', 'class="avatar" id="who-av"');
+  $("#who-name").textContent = u.name;
+  $("#pick").hidden = true; $("#app").hidden = false;
+  render();
+  if (!$("#tab-settings").hidden) loadSettings();
+}
+function showPick(canCancel) {
+  const list = users();
+  $("#pick-list").innerHTML = "";
+  list.forEach(u => {
+    const b = document.createElement("button"); b.type = "button";
+    const n = CFG.products.filter(p => ownerOf(p) === u.id).length;
+    b.innerHTML = `${avatar(u)}<span style="flex:1">${esc(u.name)}</span><span class="muted">${n} product${n === 1 ? "" : "en"}</span>`;
+    b.onclick = () => setMe(u.id);
+    $("#pick-list").appendChild(b);
+  });
+  $("#p-name").placeholder = list.length ? "Nieuw profiel, bijv. je naam" : "Je naam";
+  $("#pick-back").hidden = !canCancel;
+  $("#app").hidden = true; $("#login").hidden = true; $("#pick").hidden = false;
+}
+$("#who").onclick = () => showPick(true);
+$("#pick-cancel").onclick = () => { $("#pick").hidden = true; $("#app").hidden = false; };
+$("#pick-new").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  try { const id = await addUser($("#p-name").value); $("#p-name").value = ""; setMe(id); }
+  catch (e) { toast(e instanceof GhError ? explain(e, "Contents") : esc(e.message), 6000); }
+});
+$("#people-new").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  try { await addUser($("#pp-name").value); $("#pp-name").value = ""; renderPeople(); toast("Profiel toegevoegd."); }
+  catch (e) { toast(e instanceof GhError ? explain(e, "Contents") : esc(e.message), 6000); }
+});
+function renderPeople() {
+  const ul = $("#people"); ul.innerHTML = "";
+  users().forEach(u => {
+    const n = CFG.products.filter(p => ownerOf(p) === u.id).length;
+    const li = document.createElement("li");
+    li.innerHTML = `${avatar(u)}<span class="grow"><b>${esc(u.name)}</b>${u.id === ME ? ' <span class="muted">(jij)</span>' : ""}<br><span class="muted">${n} product${n === 1 ? "" : "en"}</span></span>
+      <button class="small" data-act="ren">Naam wijzigen</button>
+      <button class="small danger" data-act="del" ${n || u.id === ME ? "disabled title=\"Alleen mogelijk voor een ander profiel zonder producten\"" : ""}>Verwijderen</button>`;
+    li.querySelector('[data-act="ren"]').onclick = async () => {
+      const name = prompt("Nieuwe naam", u.name)?.trim(); if (!name || name === u.name) return;
+      try { await saveConfig(c => { const x = c.settings.users.find(y => y.id === u.id); if (x) x.name = name; }, `Profiel hernoemd: ${name}`);
+            renderPeople(); if (u.id === ME) setMe(ME); } catch (e) { toast(explain(e, "Contents"), 6000); }
+    };
+    li.querySelector('[data-act="del"]').onclick = async () => {
+      if (!confirm(`Profiel ${u.name} verwijderen?`)) return;
+      try { await saveConfig(c => { c.settings.users = c.settings.users.filter(y => y.id !== u.id); }, `Profiel verwijderd: ${u.name}`);
+            renderPeople(); } catch (e) { toast(explain(e, "Contents"), 6000); }
+    };
+    ul.appendChild(li);
+  });
+}
 
 async function loadConfig() {
   try { const f = await getFile("products.json"); CFG = JSON.parse(f.text); }
@@ -453,10 +587,10 @@ function render() {
   renderStatus();
   charts.forEach(c => c.destroy()); charts = [];
   const grid = $("#grid");
-  const list = CFG.products;
+  const list = scope === "all" ? CFG.products : CFG.products.filter(p => ownerOf(p) === ME);
   $("#count").textContent = list.length ? `${list.length} product${list.length === 1 ? "" : "en"}` : "";
   $("#a-disc").placeholder = CFG.defaults.min_discount_percent ?? 10;
-  if (!list.length) { grid.innerHTML = `<div class="card empty" style="grid-column:1/-1">Nog geen producten. Plak hierboven een product-URL om te beginnen.</div>`; return; }
+  if (!list.length) { grid.innerHTML = `<div class="card empty" style="grid-column:1/-1">${scope === "all" ? "Nog geen producten." : "Je volgt nog geen producten. Plak hierboven een product-URL om te beginnen."}</div>`; return; }
   grid.innerHTML = "";
   const now = Date.now();
   const sorted = [...list].sort((a, b) => (b.active !== false) - (a.active !== false));
@@ -471,7 +605,10 @@ function render() {
     card.innerHTML = `
       <div class="p-head">
         <h3><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(productName(p, e))}</a></h3>
-        ${p.active === false ? `<span class="badge off">gepauzeerd</span>` : ""}
+        <span style="display:flex;gap:6px;align-items:flex-start;flex:none">
+          ${scope === "all" && userById(ownerOf(p)) ? `<span class="badge owner">${avatar(userById(ownerOf(p)))}${esc(userById(ownerOf(p)).name)}</span>` : ""}
+          ${p.active === false ? `<span class="badge off">gepauzeerd</span>` : ""}
+        </span>
       </div>
       <div class="muted">${pending ? `<span class="spinner"></span> Prijs wordt opgehaald… (± 1 minuut)` : "Gecontroleerd " + ago(e.last_checked)}</div>
       ${hasPrice ? `
@@ -614,14 +751,14 @@ $("#add-form").addEventListener("submit", async ev => {
   const btn = $("#a-submit");
   let item;
   try { item = clean(readFields("a")); } catch (e) { toast(esc(e.message)); return; }
-  if (CFG.products.some(p => p.url === item.url)) { toast("Deze URL wordt al gevolgd."); return; }
+  if (CFG.products.some(p => p.url === item.url && ownerOf(p) === ME)) { toast("Deze URL volg je al."); return; }
   btn.disabled = true;
   try {
     let id;
     await saveConfig(cfg => {
-      if (cfg.products.some(p => p.url === item.url)) throw new Error("Deze URL wordt al gevolgd.");
+      if (cfg.products.some(p => p.url === item.url && (p.owner || cfg.settings.users?.[0]?.id) === ME)) throw new Error("Deze URL volg je al.");
       id = slugFor(item.url, item.name, new Set(cfg.products.map(p => p.id)));
-      cfg.products.push({ id, ...item });
+      cfg.products.push({ id, owner: ME, ...item });
     }, `Product toegevoegd: ${item.name || id}`);
     $("#add-form").reset();
     toast("Toegevoegd. De eerste prijs wordt nu opgehaald…");
@@ -664,7 +801,7 @@ $("#edit-form").addEventListener("submit", async ev => {
     await saveConfig(cfg => {
       const i = cfg.products.findIndex(p => p.id === id);
       if (i < 0) throw new Error("Product niet meer gevonden.");
-      cfg.products[i] = clean({ id, ...item });
+      cfg.products[i] = clean({ id, owner: cfg.products[i].owner, ...item });
     }, `Product bijgewerkt: ${id}`);
     render(); toast("Opgeslagen.");
   } catch (e) { toast(e instanceof GhError ? explain(e, "Contents") : esc(e.message), 8000); }
@@ -679,8 +816,12 @@ $("#e-delete").onclick = async () => {
   } catch (e) { toast(e instanceof GhError ? explain(e, "Contents") : esc(e.message), 8000); }
 };
 
-document.querySelectorAll(".ranges button").forEach(b => b.addEventListener("click", () => {
-  document.querySelectorAll(".ranges button").forEach(x => x.setAttribute("aria-pressed", x === b));
+document.querySelectorAll("#scope button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("#scope button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  scope = b.dataset.scope; render();
+}));
+document.querySelectorAll(".ranges:not(#scope) button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".ranges:not(#scope) button").forEach(x => x.setAttribute("aria-pressed", x === b));
   days = +b.dataset.days; render();
 }));
 document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
@@ -692,6 +833,7 @@ document.querySelectorAll("nav button").forEach(b => b.addEventListener("click",
 
 // ---------------------------------------------------------------- settings
 async function loadSettings() {
+  renderPeople();
   $("#c-disc").value = CFG.defaults.min_discount_percent ?? 10;
   $("#c-ref").value = CFG.defaults.reference_days ?? 30;
   try {
@@ -699,6 +841,14 @@ async function loadSettings() {
     const have = new Set(secrets.map(s => s.name));
     document.querySelectorAll(".set").forEach(el => el.textContent = have.has(el.dataset.for) ? "✓ ingesteld" : "");
     SECRET_NAMES.forEach(n => $(`#s-${n}`).placeholder = have.has(n) ? "•••• (ongewijzigd)" : $(`#s-${n}`).dataset.ph ?? $(`#s-${n}`).placeholder);
+    // persoonlijk; het oude algemene adres (MAIL_TO) geldt als terugval voor het eerste profiel
+    const legacy = users()[0]?.id === ME;
+    document.querySelectorAll("[data-me]").forEach(el => {
+      const base = el.dataset.me;
+      el.textContent = have.has(meKey(base)) ? "✓ ingesteld" : (legacy && have.has(base) ? "✓ ingesteld (algemeen)" : "");
+    });
+    $("#s-ME_MAIL").placeholder = have.has(meKey("MAIL_TO")) || (legacy && have.has("MAIL_TO")) ? "•••• (ongewijzigd)" : "jij@voorbeeld.nl";
+    $("#s-ME_NTFY").placeholder = have.has(meKey("NTFY_TOPIC")) || (legacy && have.has("NTFY_TOPIC")) ? "•••• (ongewijzigd)" : "bijv. sanne-pw-8f3k2";
   } catch (e) { toast(explain(e, "Secrets"), 8000); }
   try {
     const wf = await getFile(`.github/workflows/${WORKFLOW}`);
@@ -713,20 +863,37 @@ $("#m-preset").addEventListener("change", ev => {
   if (p?.SMTP_HOST) { $("#s-SMTP_HOST").value = p.SMTP_HOST; $("#s-SMTP_PORT").value = p.SMTP_PORT; }
 });
 
-$("#mail-form").addEventListener("submit", async ev => {
-  ev.preventDefault();
-  const values = Object.fromEntries(SECRET_NAMES.map(n => [n, $(`#s-${n}`).value.trim()]).filter(([, v]) => v));
-  if (!Object.keys(values).length) { toast("Er is niets ingevuld om op te slaan."); return; }
-  try {
-    const key = await gh(repoPath("/actions/secrets/public-key"));
+async function saveSecrets(values) {
+  const key = await gh(repoPath("/actions/secrets/public-key"));
     const pk = Uint8Array.from(atob(key.key), c => c.charCodeAt(0));
     for (const [name, value] of Object.entries(values)) {
       const sealed = SealedBox.seal(new TextEncoder().encode(value), pk, nacl);
       let bin = ""; sealed.forEach(b => bin += String.fromCharCode(b));
       await gh(repoPath(`/actions/secrets/${name}`), { method: "PUT", body: { encrypted_value: btoa(bin), key_id: key.key_id } });
     }
+}
+$("#mail-form").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const values = Object.fromEntries(SECRET_NAMES.map(n => [n, $(`#s-${n}`).value.trim()]).filter(([, v]) => v));
+  if (!Object.keys(values).length) { toast("Er is niets ingevuld om op te slaan."); return; }
+  try {
+    await saveSecrets(values);
     SECRET_NAMES.forEach(n => $(`#s-${n}`).value = "");
     toast("Opgeslagen. Stuur een testmail om te controleren of het werkt.");
+    loadSettings();
+  } catch (e) { toast(e instanceof GhError ? explain(e, "Secrets") : esc(e.message), 8000); }
+});
+
+$("#me-form").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const mail = $("#s-ME_MAIL").value.trim(), topic = $("#s-ME_NTFY").value.trim();
+  if (mail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { toast("Dat e-mailadres klopt niet."); return; }
+  const values = {}; if (mail) values[meKey("MAIL_TO")] = mail; if (topic) values[meKey("NTFY_TOPIC")] = topic;
+  if (!Object.keys(values).length) { toast("Er is niets ingevuld om op te slaan."); return; }
+  try {
+    await saveSecrets(values);
+    $("#s-ME_MAIL").value = ""; $("#s-ME_NTFY").value = "";
+    toast("Opgeslagen. Stuur een testmelding om te controleren of het werkt.");
     loadSettings();
   } catch (e) { toast(e instanceof GhError ? explain(e, "Secrets") : esc(e.message), 8000); }
 });
@@ -734,13 +901,13 @@ $("#mail-form").addEventListener("submit", async ev => {
 $("#test-mail").addEventListener("click", async ev => {
   const btn = ev.target; btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Bezig…`;
   try {
-    const since = await dispatch({ only: "", force: "false", test_mail: "true" });
+    const since = await dispatch({ only: "", force: "false", test_mail: "true", user: ME });
     const run = await waitForRun(since, 3 * 60000);
-    if (run?.conclusion === "success") toast("Testmail verstuurd. Kijk in je inbox (en eventueel in de spam).", 8000);
-    else if (run) toast(`Testmail mislukt; controleer server, poort en wachtwoord. <a href="${esc(run.html_url)}" target="_blank" rel="noopener" style="color:inherit">Foutmelding bekijken</a>`, 12000);
+    if (run?.conclusion === "success") toast("Testmelding verstuurd. Kijk in je inbox (en eventueel in de spam).", 8000);
+    else if (run) toast(`Testmelding mislukt; controleer je e-mailadres en het verzendaccount. <a href="${esc(run.html_url)}" target="_blank" rel="noopener" style="color:inherit">Foutmelding bekijken</a>`, 12000);
     else toast("Geen reactie van GitHub Actions. Probeer het zo nog eens.");
   } catch (e) { toast(e instanceof GhError ? explain(e, "Actions") : esc(e.message), 8000); }
-  finally { btn.disabled = false; btn.textContent = "Testmail sturen"; loadRuns().then(renderStatus); }
+  finally { btn.disabled = false; btn.textContent = "Testmelding sturen"; loadRuns().then(renderStatus); }
 });
 
 $("#check-form").addEventListener("submit", async ev => {
@@ -768,8 +935,8 @@ function guessRepo() {
   return `${owner}/${name || h}`;
 }
 function logout() {
-  store.set("pw_token", null); TOKEN = "";
-  $("#app").hidden = true; $("#login").hidden = false;
+  store.set("pw_token", null); store.set("pw_user", null); TOKEN = ""; ME = null;
+  $("#app").hidden = true; $("#pick").hidden = true; $("#login").hidden = false;
 }
 $("#logout").onclick = logout;
 
@@ -795,8 +962,9 @@ async function start() {
   $("#acc-repo").textContent = REPO;
   $("#acc-link").href = repo.html_url;
   await Promise.all([loadConfig(), loadHistory(), loadRuns()]);
-  $("#login").hidden = true; $("#app").hidden = false;
-  render();
+  $("#login").hidden = true;
+  const saved = store.get("pw_user");
+  if (saved && userById(saved)) setMe(saved); else showPick(false);
   // link naar deze app meesturen in de alarmmails
   const here = location.origin + location.pathname;
   if (location.protocol === "https:" && CFG.settings.dashboard_url !== here)
