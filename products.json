@@ -1,6 +1,12 @@
 {
   "settings": {
-    "dashboard_url": "https://dennishzd.github.io/thering/"
+    "dashboard_url": "https://dennishzd.github.io/thering/",
+    "users": [
+      {
+        "id": "dennis",
+        "name": "Dennis"
+      }
+    ]
   },
   "defaults": {
     "min_discount_percent": 10,
