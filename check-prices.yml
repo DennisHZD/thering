@@ -1,0 +1,82 @@
+name: Prijzen controleren
+
+on:
+  schedule:
+    # Wordt aangepast via de webapp (Instellingen > Controlefrequentie).
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Alleen dit product-id controleren (leeg = alles)"
+        type: string
+        default: ""
+      force:
+        description: "Interval negeren"
+        type: boolean
+        default: true
+      test_mail:
+        description: "Alleen een testmail sturen"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pricewatch-${{ inputs.test_mail && 'mail' || 'check' }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Dependencies installeren
+        run: pip install -r requirements.txt
+
+      - name: "Headless browser installeren (alleen bij JavaScript-producten)"
+        if: ${{ !inputs.test_mail }}
+        run: |
+          if python -c "import json,sys; sys.exit(0 if any(p.get('render') for p in json.load(open('products.json'))['products']) else 1)"; then
+            pip install playwright
+            python -m playwright install --with-deps chromium
+          fi
+
+      - name: Prijzen controleren
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          ONLY: ${{ inputs.only }}
+          FORCE: ${{ inputs.force }}
+          TEST_MAIL: ${{ inputs.test_mail }}
+        run: |
+          if [ "$TEST_MAIL" = "true" ]; then python -m pricewatch.main --test-mail
+          elif [ -n "$ONLY" ]; then python -m pricewatch.main --only "$ONLY"
+          elif [ "$FORCE" = "true" ]; then python -m pricewatch.main --force
+          else python -m pricewatch.main; fi
+
+      - name: Historie opslaan
+        if: ${{ !inputs.test_mail }}
+        run: |
+          git config user.name "price-watch-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/history.json
+          if git diff --cached --quiet; then echo "Geen wijzigingen"; exit 0; fi
+          git commit -m "Prijzen bijgewerkt $(date -u +'%Y-%m-%d %H:%M') UTC"
+          for i in 1 2 3; do
+            git pull --rebase -X theirs && git push && exit 0
+            sleep 5
+          done
+          exit 1

@@ -1,0 +1,13 @@
+{
+  "settings": {
+    "dashboard_url": ""
+  },
+  "defaults": {
+    "min_discount_percent": 10,
+    "reference_days": 30,
+    "spike_days": 14,
+    "min_history_days": 3,
+    "interval_minutes": 0
+  },
+  "products": []
+}
