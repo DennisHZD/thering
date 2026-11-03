@@ -110,6 +110,9 @@
   #login li { margin-bottom: 6px; }
   code { background: var(--field); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: 13px; }
   .err { color: var(--bad); font-size: 14px; min-height: 1em; }
+  .checklist { list-style: none; padding: 10px 12px; margin: 0; background: var(--field); border: 1px solid var(--line); border-radius: 10px; font-size: 14px; }
+  .checklist li { padding: 3px 0; }
+  .checklist .ok { color: var(--good); } .checklist .no { color: var(--bad); }
   .set { color: var(--good); font-weight: 400; font-size: 12px; margin-left: 6px; }
 
   dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text); padding: 20px; width: min(560px, calc(100vw - 32px)); }
@@ -138,19 +141,27 @@
         <input id="l-token" type="password" placeholder="github_pat_…" required autocomplete="current-password">
       </div>
       <div class="err" id="l-err"></div>
+      <ul id="l-check" class="checklist" hidden></ul>
       <button class="primary" type="submit" style="width:100%">Inloggen</button>
     </form>
     <details>
       <summary>Hoe maak ik een token aan?</summary>
+      <p style="font-size:14px"><b>Makkelijkste manier: klassiek token</b> (alles staat al goed ingevuld)</p>
+      <ol>
+        <li>Open <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=Price%20Watch" target="_blank" rel="noopener">GitHub → Klassiek token aanmaken</a>. De vinkjes <code>repo</code> en <code>workflow</code> staan al aan.</li>
+        <li>Kies een vervaldatum (bijv. 1 jaar), klik onderaan op <i>Generate token</i> en plak het token (<code>ghp_…</code>) hierboven.</li>
+      </ol>
+      <p class="muted">Let op: een klassiek token geeft toegang tot al je repositories. Bewaar het dus net zo zorgvuldig als een wachtwoord.</p>
+      <p style="font-size:14px;margin-top:16px"><b>Of: fine-grained token</b> (alleen toegang tot deze ene repository)</p>
       <ol>
         <li>Open <a id="pat-link" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → Fine-grained token aanmaken</a>.</li>
-        <li>Naam: <code>Price Watch</code>, vervaldatum naar keuze (bijv. 1 jaar).</li>
-        <li><b>Repository access</b>: <i>Only select repositories</i> → kies je price-watch-repo.</li>
-        <li><b>Permissions → Repository</b>, zet op <i>Read and write</i>: <code>Actions</code>, <code>Contents</code>, <code>Secrets</code>, <code>Workflows</code>.</li>
-        <li>Klik <i>Generate token</i> en plak het hierboven.</li>
+        <li><b>Resource owner</b>: je eigen gebruikersnaam (dezelfde als in de repository-naam hierboven).</li>
+        <li><b>Repository access</b>: kies <i>Only select repositories</i> en selecteer je price-watch-repo. <span class="muted">Niet "Public repositories": die optie geeft alleen leesrechten.</span></li>
+        <li><b>Permissions</b>: klik op <i>Add permissions</i> (of open <i>Repository permissions</i>) en voeg <code>Actions</code>, <code>Contents</code>, <code>Secrets</code> en <code>Workflows</code> toe. <b>Zet bij elk het keuzemenu van <i>Read-only</i> op <i>Read and write</i>.</b> Dat is de stap die het vaakst wordt overgeslagen.</li>
+        <li>Klik op <i>Generate token</i> en plak het token (<code>github_pat_…</code>) hierboven.</li>
       </ol>
-      <p class="muted">Het token blijft alleen in deze browser bewaard en geeft uitsluitend toegang tot die ene repository.</p>
-      <p class="muted"><b>Voor je partner:</b> maak op dezelfde manier een tweede token aan (bijv. naam <code>Price Watch – Sanne</code>) en geef dat aan je partner. Zo kun je het later los intrekken.</p>
+      <p class="muted">Het token wordt alleen in deze browser bewaard en nergens anders naartoe gestuurd dan naar GitHub.</p>
+      <p class="muted"><b>Voor je partner:</b> maak op dezelfde manier (met jouw account) een tweede token aan (bijv. naam <code>Price Watch – Sanne</code>) en geef dat aan je partner. Zo kun je het later los intrekken.</p>
     </details>
   </div>
 </section>
@@ -453,8 +464,26 @@ async function addUser(name) {
     if (!list.length) cfg.products.forEach(p => { p.owner ||= id; });   // bestaande producten horen bij het eerste profiel
     list.push({ id, name });
   }, `Profiel toegevoegd: ${name}`);
+  await syncWorkflowSafe();
   return id;
 }
+// De workflow geeft per profiel alleen de eigen secrets door (expliciet, zodat GitHub de workflow niet als verdacht ziet).
+async function syncWorkflowProfiles() {
+  const ids = users().map(u => u.id.toUpperCase());
+  const wf = await getFile(`.github/workflows/${WORKFLOW}`);
+  const start = "          # --- profielen (wordt bijgewerkt door de webapp) ---", end = "          # --- einde profielen ---";
+  const lines = ids.flatMap(id => [`          MAIL_TO_${id}: \${{ secrets.MAIL_TO_${id} }}`, `          NTFY_TOPIC_${id}: \${{ secrets.NTFY_TOPIC_${id} }}`]);
+  const block = [start, ...lines, end].join("\n");
+  const re = new RegExp(start.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\s\\S]*?" + end.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (!re.test(wf.text)) return;                       // oudere workflow zonder blok: niets doen
+  const updated = wf.text.replace(re, block);
+  if (updated !== wf.text) await putFile(`.github/workflows/${WORKFLOW}`, updated, wf.sha, "Profielen bijgewerkt in workflow");
+}
+async function syncWorkflowSafe() {
+  try { await syncWorkflowProfiles(); }
+  catch (e) { toast(e instanceof GhError ? explain(e, "Workflows") : esc(e.message), 10000); }
+}
+
 function setMe(id) {
   ME = id; store.set("pw_user", id);
   const u = userById(id);
@@ -759,7 +788,7 @@ $("#add-form").addEventListener("submit", async ev => {
       if (cfg.products.some(p => p.url === item.url && (p.owner || cfg.settings.users?.[0]?.id) === ME)) throw new Error("Deze URL volg je al.");
       id = slugFor(item.url, item.name, new Set(cfg.products.map(p => p.id)));
       cfg.products.push({ id, owner: ME, ...item });
-    }, `Product toegevoegd: ${item.name || id}`);
+    }, `Product toegevoegd: ${item.name || slugFor(item.url, item.name, new Set())}`);
     $("#add-form").reset();
     toast("Toegevoegd. De eerste prijs wordt nu opgehaald…");
     btn.disabled = false;
@@ -892,6 +921,7 @@ $("#me-form").addEventListener("submit", async ev => {
   if (!Object.keys(values).length) { toast("Er is niets ingevuld om op te slaan."); return; }
   try {
     await saveSecrets(values);
+    await syncWorkflowSafe();
     $("#s-ME_MAIL").value = ""; $("#s-ME_NTFY").value = "";
     toast("Opgeslagen. Stuur een testmelding om te controleren of het werkt.");
     loadSettings();
@@ -942,23 +972,67 @@ $("#logout").onclick = logout;
 
 $("#login-form").addEventListener("submit", async ev => {
   ev.preventDefault();
-  const err = $("#l-err"); err.textContent = "";
+  const err = $("#l-err"); err.textContent = ""; $("#l-check").hidden = true;
   REPO = $("#l-repo").value.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "");
   TOKEN = $("#l-token").value.trim();
   try {
     await start();
     store.set("pw_repo", REPO); store.set("pw_token", TOKEN);
-  } catch (e) {
-    err.innerHTML = e.status === 401 ? "Token ongeldig of verlopen." :
-      e.status === 404 ? "Repository niet gevonden, of het token heeft er geen toegang toe." : esc(e.message);
-    $("#app").hidden = true; $("#login").hidden = false;
-  }
+  } catch (e) { showLoginError(e); }
 });
+function showLoginError(e) {
+  const err = $("#l-err");
+  {
+    if (e instanceof AccessError) {
+      err.innerHTML = "Inloggen lukt, maar er ontbreekt nog iets:";
+      $("#l-check").innerHTML = e.list.map(i => i.ok
+        ? `<li class="ok">✓ ${i.label}</li>`
+        : `<li class="no">✗ <b>${i.label}</b><br><span style="color:var(--text)">${i.fix}</span></li>`).join("") +
+        `<li class="muted" style="margin-top:8px">Pas het aan en klik daarna opnieuw op <i>Inloggen</i>.</li>`;
+      $("#l-check").hidden = false;
+      document.querySelector("#login details").open = true;
+    } else err.innerHTML = e.status === 401 ? "Token ongeldig of verlopen. Controleer of je het hele token hebt geplakt." :
+      e.status === 404 ? `Repository <b>${esc(REPO)}</b> niet gevonden, of het token heeft er geen toegang toe. Controleer de naam (hoofdletters tellen niet) en of je bij het token deze repository hebt geselecteerd.` : esc(e.message);
+    $("#app").hidden = true; $("#pick").hidden = true; $("#login").hidden = false;
+  }
+}
+
+// Controleer welke rechten het token echt heeft (zonder iets te wijzigen).
+async function checkAccess(repo) {
+  const probe = async fn => { try { await fn(); return { ok: true }; } catch (e) { return { ok: false, status: e.status || 0, msg: e.message || "" }; } };
+  const [write, products, workflow, secrets] = await Promise.all([
+    // Schrijftest: een los git-object aanmaken. Dat wijzigt geen bestanden of commits en wordt door GitHub vanzelf opgeruimd.
+    probe(() => gh(repoPath("/git/blobs"), { method: "POST", body: { content: "price-watch toegangscontrole", encoding: "utf-8" } })),
+    probe(() => gh(repoPath(`/contents/products.json?ref=${BRANCH}`))),
+    probe(() => gh(repoPath(`/actions/workflows/${WORKFLOW}`))),
+    probe(() => gh(repoPath("/actions/secrets/public-key"))),
+  ]);
+  const items = [];
+  const add = (ok, label, fix) => items.push({ ok, label, fix });
+  const saml = [write, secrets, workflow].find(r => /SAML|SSO/i.test(r.msg || ""));
+  if (saml) add(false, "Token goedgekeurd voor de organisatie",
+    `Deze repository valt onder een organisatie met SSO. Ga naar <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">je tokens</a>, klik bij het token op <i>Configure SSO</i> → <i>Authorize</i> bij de organisatie.`);
+  add(write.ok, "Schrijven in de repository", write.ok ? "" :
+    (repo.permissions && !repo.permissions.push
+      ? "Je GitHub-account zelf heeft geen schrijfrechten op deze repository. Gebruik je eigen repository, of laat de eigenaar je als collaborator toevoegen."
+      : "Klassiek token: vink <code>repo</code> aan. Fine-grained token: zet <i>Contents</i> op <i>Read and write</i>.") + ` <span class="muted">(GitHub: ${write.status} ${esc(write.msg)})</span>`);
+  add(products.ok || products.status !== 404, "Bestand products.json in de hoofdmap", products.ok || products.status !== 404 ? "" :
+    "Niet gevonden. Waarschijnlijk staat alles in een submap (bijv. <code>price-watcher/</code>). Upload de <b>inhoud</b> van de map, zodat <code>products.json</code>, <code>docs</code> en <code>.github</code> direct in de hoofdmap staan.");
+  add(workflow.ok, "Workflow .github/workflows/check-prices.yml", workflow.ok ? "" :
+    workflow.status === 404
+      ? "Niet gevonden. De map <code>.github</code> is waarschijnlijk niet mee-geüpload: verborgen mappen worden bij slepen vaak overgeslagen. Oplossing: maak verborgen bestanden zichtbaar (Mac: <code>Cmd+Shift+.</code> in Finder, Windows: Verkenner → <i>Weergave</i> → <i>Verborgen items</i>) en sleep de map <code>.github</code> alsnog naar je repository. Of kies op GitHub <i>Add file → Create new file</i>, typ als naam <code>.github/workflows/check-prices.yml</code> en plak de inhoud van dat bestand."
+      : `Geen toegang tot Actions. Klassiek token: vink <code>workflow</code> aan. Fine-grained: <i>Actions</i> op <i>Read and write</i>. <span class="muted">(GitHub: ${workflow.status})</span>`);
+  add(secrets.ok, "Instellingen (secrets) opslaan", secrets.ok ? "" :
+    `Klassiek token: vink <code>repo</code> aan. Fine-grained: <i>Secrets</i> op <i>Read and write</i>. <span class="muted">(GitHub: ${secrets.status})</span>`);
+  return items;
+}
+class AccessError extends Error { constructor(list) { super("Onvoldoende rechten"); this.list = list; } }
 
 async function start() {
   const repo = await gh(`/repos/${REPO}`);
-  if (repo.permissions && !repo.permissions.push) throw new Error("Dit token heeft geen schrijfrechten (Contents: Read and write).");
   BRANCH = repo.default_branch || "main";
+  const access = await checkAccess(repo);
+  if (access.some(i => !i.ok)) throw new AccessError(access);
   $("#acc-repo").textContent = REPO;
   $("#acc-link").href = repo.html_url;
   await Promise.all([loadConfig(), loadHistory(), loadRuns()]);
@@ -981,8 +1055,7 @@ $("#l-repo").value = store.get("pw_repo") || guessRepo();
 REPO = $("#l-repo").value; TOKEN = store.get("pw_token") || "";
 if (REPO && TOKEN) start().catch(e => {
   if (e.status === 401) store.set("pw_token", null); else $("#l-token").value = TOKEN;
-  $("#l-err").innerHTML = e.status === 401 ? "Je sessie is verlopen; log opnieuw in." : "Kon niet verbinden: " + esc(e.message);
-  $("#app").hidden = true; $("#login").hidden = false;
+  showLoginError(e);
 }); else $("#login").hidden = false;
 </script>
 </body>
