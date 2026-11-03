@@ -19,5 +19,12 @@
     "min_history_days": 3,
     "interval_minutes": 0
   },
-  "products": []
+  "products": [
+    {
+      "id": "big-hug-s3-xl-woolly",
+      "owner": "henk",
+      "url": "https://nl.stoov.com/products/big-hug-s3-xl-woolly?_gl=1*1jzd3k0*_up*MQ..*_gs*MQ..&gclid=CjwKCAiAhqHXBhAXEiwATbksU6apy2FDwcuZNcUjEmVRw3QwZaNnhyjGY_-PyeOHiY_c-MDSKUbgpRoCOoQQAvD_BwE&gbraid=0AAAAADcxc1sit3We-aZ8J1csXq-nUeqj6&variant=56551763902845",
+      "min_discount_percent": 20
+    }
+  ]
 }
