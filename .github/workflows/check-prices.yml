@@ -62,9 +62,13 @@ jobs:
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          # persoonlijke instellingen per profiel (MAIL_TO_<PROFIEL>, NTFY_TOPIC_<PROFIEL>)
-          SECRETS_JSON: ${{ toJSON(secrets) }}
           TEST_USER: ${{ inputs.user }}
+          # --- profielen (wordt bijgewerkt door de webapp) ---
+          MAIL_TO_DENNIS: ${{ secrets.MAIL_TO_DENNIS }}
+          NTFY_TOPIC_DENNIS: ${{ secrets.NTFY_TOPIC_DENNIS }}
+          MAIL_TO_HENK: ${{ secrets.MAIL_TO_HENK }}
+          NTFY_TOPIC_HENK: ${{ secrets.NTFY_TOPIC_HENK }}
+          # --- einde profielen ---
           ONLY: ${{ inputs.only }}
           FORCE: ${{ inputs.force }}
           TEST_MAIL: ${{ inputs.test_mail }}
