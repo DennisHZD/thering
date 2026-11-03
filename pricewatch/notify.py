@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import html
-import json
 import os
 import smtplib
 import ssl
@@ -16,17 +15,10 @@ def _env(name: str, default: str | None = None) -> str | None:
     return val.strip() if isinstance(val, str) and val.strip() else default
 
 
-def _secrets() -> dict:
-    try:
-        return json.loads(os.environ.get("SECRETS_JSON") or "{}")
-    except json.JSONDecodeError:
-        return {}
-
-
 def _personal(base: str, user: str | None) -> str | None:
     """Persoonlijke instelling (bijv. MAIL_TO_DENNIS), anders de algemene (MAIL_TO)."""
     if user:
-        val = _secrets().get(f"{base}_{user.upper()}") or os.environ.get(f"{base}_{user.upper()}")
+        val = os.environ.get(f"{base}_{user.upper()}")
         if val and val.strip():
             return val.strip()
     return _env(base)
