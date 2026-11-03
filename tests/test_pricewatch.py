@@ -78,7 +78,7 @@ def test_extract_title():
 def test_personal_recipient(monkeypatch):
     from pricewatch import notify
     monkeypatch.setenv("MAIL_TO", "algemeen@x.nl")
-    monkeypatch.setenv("SECRETS_JSON", '{"MAIL_TO_SANNE": "sanne@x.nl"}')
+    monkeypatch.setenv("MAIL_TO_SANNE", "sanne@x.nl")
     assert notify.recipient("sanne") == "sanne@x.nl"
     assert notify.recipient("dennis") == "algemeen@x.nl"
     assert notify.recipient(None) == "algemeen@x.nl"
