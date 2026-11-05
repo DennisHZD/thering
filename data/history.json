@@ -2,7 +2,7 @@
  "products": {
   "big-hug-s3-xl-woolly": {
    "url": "https://nl.stoov.com/products/big-hug-s3-xl-woolly?_gl=1*1jzd3k0*_up*MQ..*_gs*MQ..&gclid=CjwKCAiAhqHXBhAXEiwATbksU6apy2FDwcuZNcUjEmVRw3QwZaNnhyjGY_-PyeOHiY_c-MDSKUbgpRoCOoQQAvD_BwE&gbraid=0AAAAADcxc1sit3We-aZ8J1csXq-nUeqj6&variant=56551763902845",
-   "last_checked": "2026-11-05T01:49:03+00:00",
+   "last_checked": "2026-11-05T08:39:53+00:00",
    "history": [
     {
      "t": "2026-11-03T06:48:07+00:00",
@@ -27,6 +27,10 @@
     {
      "t": "2026-11-05T01:49:03+00:00",
      "p": 129.95
+    },
+    {
+     "t": "2026-11-05T08:39:53+00:00",
+     "p": 129.95
     }
    ],
    "title": "Big Hug³ XL | Woolly",
@@ -46,11 +50,11 @@
     "window_days": 30.0,
     "real_discount_pct": 0.0,
     "warnings": [
-     "Nog maar 1.8 dag(en) historie; korting is minder betrouwbaar."
+     "Nog maar 2.1 dag(en) historie; korting is minder betrouwbaar."
     ]
    },
    "active": true
   }
  },
- "updated": "2026-11-05T01:49:03+00:00"
+ "updated": "2026-11-05T08:39:53+00:00"
 }
